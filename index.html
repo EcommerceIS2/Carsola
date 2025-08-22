@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bielle — Simple Profile + Gallery</title>
+
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+  <style>
+    :root{
+      --sidebar-w:220px;
+      --accent:#4f46e5;
+      --muted:#6b7280;
+      --bg:#f7f7fb;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;font-family:Inter,Arial,sans-serif;background:var(--bg);color:#111}
+
+    /* layout */
+    .app{display:flex;height:100vh;overflow:hidden}
+    .sidebar{
+      width:var(--sidebar-w);background:#0f172a;color:#fff;padding:20px;display:flex;flex-direction:column;
+    }
+    .brand{font-weight:700;font-size:18px;text-align:center;margin-bottom:8px}
+    .nav{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+    .nav button{appearance:none;border:0;background:transparent;color:inherit;padding:10px 8px;border-radius:8px;text-align:left;cursor:pointer;display:flex;gap:10px;align-items:center;font-weight:600}
+    .nav button:hover{background:rgba(255,255,255,0.04)}
+    .nav button.active{background:rgba(255,255,255,0.06)}
+    .profile-compact{margin-top:auto;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05);display:flex;gap:10px;align-items:center}
+    .profile-compact img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+
+    /* content area */
+    .content{flex:1;position:relative;padding:24px;display:flex;align-items:stretch;justify-content:center}
+    .panel{position:absolute;inset:24px;border-radius:10px;background:#fff;box-shadow:0 8px 30px rgba(2,6,23,0.06);overflow:hidden;display:none;flex-direction:column}
+    .panel.active{display:flex}
+    .panel-header{padding:18px 20px;border-bottom:1px solid #f1f5f9;background:linear-gradient(90deg,rgba(79,70,229,0.03),transparent)}
+    .panel-body{padding:18px 20px;overflow:auto;flex:1}
+
+    /* simple fade */
+    .panel {opacity:0;transform:translateY(6px);transition:opacity .22s ease, transform .22s ease}
+    .panel.active{opacity:1;transform:none}
+
+    /* home */
+    .home-intro{max-width:760px;line-height:1.5;color:var(--muted)}
+
+    /* gallery */
+    .gallery-controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    .btn{appearance:none;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+    .btn.ghost{background:#eef2ff;color:var(--accent);border:1px solid rgba(79,70,229,0.14)}
+    .btn.primary{background:var(--accent);color:#fff}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+    .grid .thumb{border-radius:8px;overflow:hidden;cursor:pointer;height:120px}
+    .grid .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+
+    .list{display:flex;flex-direction:column;gap:10px}
+    .list .row{display:flex;gap:12px;align-items:center;padding:10px;border-radius:8px;background:#fbfbff}
+    .list .row img{width:100px;height:70px;object-fit:cover;border-radius:6px}
+    .meta{flex:1}
+    .meta h4{margin-bottom:6px;font-size:15px}
+    .meta p{margin:0;color:var(--muted);font-size:13px}
+
+    /* profile */
+    .profile-wrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+    .avatar{width:140px;height:140px;border-radius:50%;overflow:hidden;box-shadow:0 6px 16px rgba(79,70,229,0.12)}
+    .avatar img{width:100%;height:100%;object-fit:cover}
+    .bio-table{margin-top:8px;border-collapse:collapse;width:100%}
+    .bio-table td{padding:8px 10px;border-bottom:1px dashed #eee}
+    .bio-table td:first-child{font-weight:700;color:var(--muted);width:140px}
+
+    /* about */
+    .about-grid{display:grid;grid-template-columns:1fr 280px;gap:14px}
+    .dev-card{background:#fff;border:1px solid #f1f5f9;padding:12px;border-radius:8px}
+
+    /* viewer modal */
+    .viewer{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.7);z-index:60}
+    .viewer.open{display:flex}
+    .viewer-card{max-width:1100px;width:94%;max-height:90vh;background:#fff;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+    .viewer-body{flex:1;display:flex;align-items:center;justify-content:center;background:#000}
+    .viewer-body img{max-width:100%;max-height:88vh;display:block}
+    .viewer-footer{padding:8px 12px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center}
+    .viewer-close{appearance:none;border:0;background:transparent;color:var(--muted);cursor:pointer;font-weight:700}
+
+    /* responsive */
+    @media (max-width:900px){
+      :root{--sidebar-w:180px}
+      .about-grid{grid-template-columns:1fr}
+    }
+    @media (max-width:700px){
+      .app{flex-direction:column}
+      .sidebar{width:100%;flex-direction:row;align-items:center;gap:12px;padding:12px}
+      .nav{flex-direction:row;gap:6px;overflow:auto}
+      .content{padding:12px}
+      .panel{position:relative;inset:auto;height:calc(100vh - 72px);margin-top:8px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Bielle's Site</div>
+
+      <nav class="nav" id="nav">
+        <button class="active" data-target="home"><i class="bi bi-house"></i> Home</button>
+        <button data-target="gallery"><i class="bi bi-images"></i> Gallery</button>
+        <button data-target="profile"><i class="bi bi-person-circle"></i> Profile</button>
+        <button data-target="about"><i class="bi bi-info-circle"></i> About</button>
+      </nav>
+
+      <div class="profile-compact">
+        <img src="images/photo1.jpg" alt="Bielle">
+        <div>
+          <div style="font-weight:700">Bielle Carsola</div>
+          <div style="font-size:12px;color:#cbd5e1">3rd Year • Information Systems</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+
+      <!-- HOME -->
+      <section id="home" class="panel active" aria-labelledby="homeTitle">
+        <div class="panel-header">
+          <h2 id="homeTitle" style="margin:0;color:var(--accent)">Home</h2>
+        </div>
+        <div class="panel-body">
+          <div class="home-intro">
+            <h3 style="margin-bottom:8px">Welcome 👋</h3>
+            <p>Hi — I'm <strong>Bielle Carsola</strong>. I'm a 3rd year Information Systems student from Narvacan, Ilocos Sur. I love playing mobile games and taking solo photos.</p>
+            <p style="margin-top:12px;color:var(--muted);line-height:1.5">
+              This page is a simple student-style site where I showcase a few solo photos (my blog/gallery), and share my biodata and contact details.
+            </p>
+
+            <h4 style="margin-top:14px">Quick info</h4>
+            <ul style="margin-top:8px;color:var(--muted);line-height:1.6">
+              <li>Age: 22</li>
+              <li>Course: BS Information Systems — 3rd Year</li>
+              <li>Hobby: Playing mobile games</li>
+              <li>Location: Narvacan, Ilocos Sur</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- GALLERY -->
+      <section id="gallery" class="panel" aria-labelledby="galleryTitle">
+        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center">
+          <h2 id="galleryTitle" style="margin:0;color:var(--accent)">Blog — Solo Pics</h2>
+        </div>
+        <div class="panel-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <div class="gallery-controls" aria-hidden>
+              <button class="btn ghost" id="btnGrid">Grid</button>
+              <button class="btn ghost" id="btnList">List</button>
+            </div>
+            <div style="color:var(--muted);font-size:13px">Showing <span id="galleryCount">6</span> photos</div>
+          </div>
+
+          <!-- gallery container that will be rendered by JS -->
+          <div id="galleryContainer"></div>
+        </div>
+      </section>
+
+      <!-- PROFILE -->
+      <section id="profile" class="panel" aria-labelledby="profileTitle">
+        <div class="panel-header">
+          <h2 id="profileTitle" style="margin:0;color:var(--accent)">Profile</h2>
+        </div>
+        <div class="panel-body">
+          <div class="profile-wrap">
+            <div class="avatar"><img src="images/photo1.jpg" alt="avatar"></div>
+            <div style="flex:1;min-width:240px">
+              <h3 style="margin-bottom:6px">Bielle Carsola</h3>
+              <p style="margin:0 0 10px 0;color:var(--muted)">3rd Year — BS Information Systems • Narvacan, Ilocos Sur</p>
+
+              <table class="bio-table" role="table" aria-label="biodata">
+                <tr><td>Full name</td><td>Bielle Carsola</td></tr>
+                <tr><td>Age</td><td>22</td></tr>
+                <tr><td>Course / Year</td><td>BS Information Systems — 3rd Year</td></tr>
+                <tr><td>Location</td><td>Narvacan, Ilocos Sur</td></tr>
+                <tr><td>Email</td><td><a href="mailto:carsollabielle@gmail.com">carsollabielle@gmail.com</a></td></tr>
+                <tr><td>Hobbies</td><td>Playing mobile games, Photography</td></tr>
+                <tr><td>Skills</td><td>HTML, CSS, JS (basic)</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABOUT -->
+      <section id="about" class="panel" aria-labelledby="aboutTitle">
+        <div class="panel-header">
+          <h2 id="aboutTitle" style="margin:0;color:var(--accent)">About</h2>
+        </div>
+        <div class="panel-body">
+          <div class="about-grid">
+            <div>
+              <h3 style="margin-top:0">About this site</h3>
+              <p style="color:var(--muted)">This site is for showcasing solo photos and presenting my biodata.</p>
+
+              <h4 style="margin-top:14px">How to use</h4>
+              <ol style="color:var(--muted);line-height:1.6">
+                <li>Click <strong>Gallery</strong> then choose <em>Grid</em> or <em>List</em>.</li>
+                <li>In Grid: click an image to view it larger.</li>
+                <li>In List: click <strong>View</strong> on any row to open the image viewer.</li>
+              </ol>
+            </div>
+
+            <aside class="dev-card">
+              <h4 style="margin:0 0 6px 0">Developer</h4>
+              <p style="margin:0;color:var(--muted)">Name: Bielle Carsola<br>Role: 3rd Year Information Systems Student<br>Location: Narvacan, Ilocos Sur<br>Email: <a href="mailto:carsollabielle@gmail.com">carsollabielle@gmail.com</a></p>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- viewer modal -->
+  <div id="viewer" class="viewer" role="dialog" aria-hidden="true">
+    <div class="viewer-card" role="document">
+      <div class="viewer-body"><img id="viewerImg" src="" alt="preview"></div>
+      <div class="viewer-footer">
+        <div id="viewerMeta" style="font-size:13px;color:var(--muted)"></div>
+        <div>
+          <button id="prevBtn" class="btn ghost" style="margin-right:8px">&laquo; Prev</button>
+          <button id="nextBtn" class="btn ghost" style="margin-right:12px">Next &raquo;</button>
+          <button id="closeViewer" class="viewer-close">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- NAV / panels ---
+    const navButtons = document.querySelectorAll('#nav button');
+    const panels = document.querySelectorAll('.panel');
+
+    navButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        navButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.getAttribute('data-target');
+        panels.forEach(p => p.classList.remove('active'));
+        document.getElementById(target).classList.add('active');
+
+        // reset gallery view when opening gallery
+        if (target === 'gallery') renderGallery(currentMode);
+      });
+    });
+
+    // --- Gallery data (6 photos) ---
+    const photos = [
+      { src: 'images/photo1.jpg', title: 'Solo pic 1', desc: 'Sunset portrait.' },
+      { src: 'images/photo2.jpg', title: 'Solo pic 2', desc: 'Street candid.' },
+      { src: 'images/photo3.jpg', title: 'Solo pic 3', desc: 'Studio soft light.' },
+      { src: 'images/photo4.jpg', title: 'Solo pic 4', desc: 'Seaside pose.' },
+      { src: 'images/photo5.jpg', title: 'Solo pic 5', desc: 'Night lights portrait.' },
+      { src: 'images/photo6.jpg', title: 'Solo pic 6', desc: 'Casual outdoor shot.' }
+    ];
+
+    document.getElementById('galleryCount').textContent = photos.length;
+
+    // --- gallery render logic ---
+    const galleryContainer = document.getElementById('galleryContainer');
+    let currentMode = 'grid'; // default
+
+    function renderGallery(mode = 'grid') {
+      currentMode = mode;
+      galleryContainer.innerHTML = ''; // clear
+
+      if (mode === 'grid') {
+        const grid = document.createElement('div');
+        grid.className = 'grid';
+        photos.forEach((p, i) => {
+          const thumb = document.createElement('div');
+          thumb.className = 'thumb';
+          thumb.innerHTML = `<img src="${p.src}" alt="${p.title}" data-index="${i}">`;
+          // click opens viewer
+          thumb.addEventListener('click', () => openViewer(i));
+          grid.appendChild(thumb);
+        });
+        galleryContainer.appendChild(grid);
+      } else {
+        // list mode
+        const list = document.createElement('div');
+        list.className = 'list';
+        photos.forEach((p, i) => {
+          const row = document.createElement('div');
+          row.className = 'row';
+          row.innerHTML = `
+            <img src="${p.src}" alt="${p.title}">
+            <div class="meta">
+              <h4>${p.title}</h4>
+              <p>${p.desc}</p>
+            </div>
+            <div><button class="btn primary view-btn" data-index="${i}">View</button></div>
+          `;
+          // view button
+          row.querySelector('.view-btn').addEventListener('click', () => openViewer(i));
+          list.appendChild(row);
+        });
+        galleryContainer.appendChild(list);
+      }
+    }
+
+    // controls
+    document.getElementById('btnGrid').addEventListener('click', () => renderGallery('grid'));
+    document.getElementById('btnList').addEventListener('click', () => renderGallery('list'));
+
+    // initialize gallery (if user opens gallery, it will be re-rendered)
+    renderGallery(currentMode);
+
+    // --- viewer logic ---
+    const viewer = document.getElementById('viewer');
+    const viewerImg = document.getElementById('viewerImg');
+    const viewerMeta = document.getElementById('viewerMeta');
+    const closeViewer = document.getElementById('closeViewer');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    let currentIndex = 0;
+
+    function openViewer(index) {
+      currentIndex = index;
+      const p = photos[currentIndex];
+      viewerImg.src = p.src;
+      viewerImg.alt = p.title;
+      viewerMeta.textContent = `${p.title} — ${p.desc}`;
+      viewer.classList.add('open');
+      viewer.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeViewerFn() {
+      viewer.classList.remove('open');
+      viewer.setAttribute('aria-hidden', 'true');
+      viewerImg.src = '';
+    }
+
+    function showPrev() {
+      currentIndex = (currentIndex - 1 + photos.length) % photos.length;
+      openViewer(currentIndex);
+    }
+    function showNext() {
+      currentIndex = (currentIndex + 1) % photos.length;
+      openViewer(currentIndex);
+    }
+
+    closeViewer.addEventListener('click', closeViewerFn);
+    viewer.addEventListener('click', (e) => {
+      if (e.target === viewer) closeViewerFn(); // click outside viewer-card closes
+    });
+    prevBtn.addEventListener('click', showPrev);
+    nextBtn.addEventListener('click', showNext);
+
+    // keyboard
+    window.addEventListener('keydown', (e) => {
+      if (viewer.classList.contains('open')) {
+        if (e.key === 'Escape') closeViewerFn();
+        if (e.key === 'ArrowLeft') showPrev();
+        if (e.key === 'ArrowRight') showNext();
+      }
+    });
+
+    // ensure initial panel set (Home shown)
+    document.getElementById('home').classList.add('active');
+  </script>
+</body>
+</html>
